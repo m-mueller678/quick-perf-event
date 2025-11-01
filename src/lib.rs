@@ -22,6 +22,7 @@ macro_rules! perf_reading_labels {
 }
 
 mod perf_counters;
+mod tabled_float;
 
 use crate::perf_counters::{PerfCounters, PerfReading};
 use perf_event::CounterData;
@@ -42,10 +43,14 @@ pub struct PerfEvent<L> {
 }
 
 enum OutputState {
-    Interactive {
+    Tabled {
         readings: Vec<PerfReadingExtra>,
         label_names: &'static [&'static str],
         markdown: bool,
+    },
+    Interactive {
+        header_written: OnceCell<()>,
+        label_names: &'static [&'static str],
     },
     Csv {
         header_written: OnceCell<()>,
@@ -63,7 +68,7 @@ impl OutputState {
         labels: &mut dyn FnMut(&mut dyn FnMut(&str)),
     ) {
         match self {
-            OutputState::Interactive {
+            OutputState::Tabled {
                 readings,
                 label_names: _,
                 markdown: _,
@@ -76,6 +81,10 @@ impl OutputState {
                     counters: counters.read_counters(),
                 });
             }
+            OutputState::Interactive {
+                header_written,
+                label_names,
+            } => todo!(),
             OutputState::Csv {
                 header_written,
                 label_names,
@@ -139,7 +148,7 @@ impl OutputState {
 
     fn dump_and_reset(&mut self, counters: &PerfCounters) {
         match self {
-            OutputState::Interactive {
+            OutputState::Tabled {
                 readings,
                 label_names,
                 markdown,
@@ -181,6 +190,10 @@ impl OutputState {
                 }
                 println!("{multiplex_warning}{table}");
             }
+            OutputState::Interactive {
+                header_written,
+                label_names,
+            } => todo!(),
             OutputState::Csv {
                 header_written,
                 label_names: _,
@@ -232,7 +245,7 @@ impl<L: PerfReadingLabels> PerfEvent<L> {
                         }
                         Err(_) => {}
                     }
-                    OutputState::Interactive {
+                    OutputState::Tabled {
                         readings: Vec::new(),
                         label_names: L::names(),
                         markdown,

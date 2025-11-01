@@ -23,9 +23,8 @@ macro_rules! perf_reading_labels {
 
 mod perf_counters;
 
-use perf_event::CounterData;
-
 use crate::perf_counters::{PerfCounters, PerfReading};
+use perf_event::CounterData;
 use std::{
     cell::OnceCell,
     io::{Write, stdout},
@@ -34,6 +33,7 @@ use std::{
     mem,
     time::SystemTime,
 };
+use tabled::settings::Style;
 
 pub struct PerfEvent<L> {
     counters: PerfCounters,
@@ -45,6 +45,7 @@ enum OutputState {
     Interactive {
         readings: Vec<PerfReadingExtra>,
         label_names: &'static [&'static str],
+        markdown: bool,
     },
     Csv {
         header_written: OnceCell<()>,
@@ -65,6 +66,7 @@ impl OutputState {
             OutputState::Interactive {
                 readings,
                 label_names: _,
+                markdown: _,
             } => {
                 let mut label_vec = Vec::new();
                 labels(&mut |l: &str| label_vec.push(l.to_string()));
@@ -137,6 +139,7 @@ impl OutputState {
             OutputState::Interactive {
                 readings,
                 label_names,
+                markdown,
             } => {
                 let mut table = tabled::builder::Builder::new();
                 table.push_record(label_names.iter().copied());
@@ -169,7 +172,11 @@ impl OutputState {
                 } else {
                     "\n"
                 };
-                println!("{multiplex_warning}{}", table.build());
+                let mut table = table.build();
+                if *markdown {
+                    table.with(Style::markdown());
+                }
+                println!("{multiplex_warning}{table}");
             }
             OutputState::Csv {
                 header_written,
@@ -210,12 +217,22 @@ impl<L: PerfReadingLabels> PerfEvent<L> {
                     writer: csv::Writer::from_writer(Box::new(stdout())),
                 },
                 x => {
-                    if let Ok(requested) = x {
-                        eprintln!("unrecognized value for QPE_FORMAT: {requested:?}");
+                    let mut markdown = false;
+                    match x {
+                        Ok("md") => {
+                            markdown = true;
+                        }
+                        Ok(requested) => {
+                            eprintln!(
+                                "unrecognized value for QPE_FORMAT: {requested:?}.\nSupported values: csv, md"
+                            );
+                        }
+                        Err(_) => {}
                     }
                     OutputState::Interactive {
                         readings: Vec::new(),
                         label_names: L::names(),
+                        markdown,
                     }
                 }
             },

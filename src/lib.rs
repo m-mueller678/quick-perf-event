@@ -115,6 +115,9 @@ impl OutputState {
                 if err.is_ok() {
                     err = writer.write_record(iter::empty::<&[u8]>());
                 }
+                if err.is_ok() {
+                    err = writer.flush().map_err(Into::into);
+                }
                 Self::handle_csv_result(err);
             }
         }

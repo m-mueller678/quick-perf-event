@@ -23,8 +23,17 @@ macro_rules! perf_reading_labels {
 
 mod perf_counters;
 
+use perf_event::CounterData;
+
 use crate::perf_counters::{PerfCounters, PerfReading};
-use std::{iter, marker::PhantomData, mem, time::SystemTime};
+use std::{
+    cell::OnceCell,
+    io::{Write, stdout},
+    iter,
+    marker::PhantomData,
+    mem,
+    time::SystemTime,
+};
 
 pub struct PerfEvent<L> {
     counters: PerfCounters,
@@ -36,6 +45,11 @@ enum OutputState {
     Interactive {
         readings: Vec<PerfReadingExtra>,
         label_names: &'static [&'static str],
+    },
+    Csv {
+        header_written: OnceCell<()>,
+        label_names: &'static [&'static str],
+        writer: csv::Writer<Box<dyn Write>>,
     },
 }
 
@@ -60,6 +74,61 @@ impl OutputState {
                     counters: counters.read_counters(),
                 });
             }
+            OutputState::Csv {
+                header_written,
+                label_names,
+                writer,
+            } => {
+                let mut err = Ok(());
+                macro_rules! write_field {
+                    ($x:expr) => {
+                        if err.is_ok() {
+                            err = writer.write_field($x);
+                        }
+                    };
+                }
+                header_written.get_or_init(|| {
+                    for l in label_names.iter() {
+                        write_field!(l);
+                    }
+                    for name in counters.names() {
+                        write_field!(name);
+                    }
+                    write_field!("multiplexed");
+                    if err.is_ok() {
+                        err = writer.write_record(iter::empty::<&[u8]>());
+                    }
+                });
+                labels(&mut |l| {
+                    write_field!(l);
+                });
+                let reading = counters.read_counters();
+                let mut any_multiplexed = false;
+                for counter in &reading.counters {
+                    let (scaled, multiplexed) = Self::process_counter(counter, scale);
+                    any_multiplexed |= multiplexed;
+                    write_field!(&format!("{scaled}"));
+                }
+                write_field!(&format!("{any_multiplexed}"));
+                if err.is_ok() {
+                    err = writer.write_record(iter::empty::<&[u8]>());
+                }
+                Self::handle_csv_result(err);
+            }
+        }
+    }
+
+    fn process_counter(counter: &CounterData, scale: usize) -> (f64, bool) {
+        let multiplexed = counter.time_enabled() != counter.time_running();
+        let scaled = counter.count() as f64 * counter.time_running().unwrap().as_secs_f64()
+            / counter.time_enabled().unwrap().as_secs_f64()
+            / scale as f64;
+        (scaled, multiplexed)
+    }
+
+    fn handle_csv_result(err: csv::Result<()>) {
+        if let Err(err) = err {
+            eprintln!("error writing csv: {err}");
         }
     }
 
@@ -102,6 +171,14 @@ impl OutputState {
                 };
                 println!("{multiplex_warning}{}", table.build());
             }
+            OutputState::Csv {
+                header_written,
+                label_names: _,
+                writer,
+            } => {
+                header_written.take();
+                Self::handle_csv_result(writer.flush().map_err(Into::into));
+            }
         }
     }
 }
@@ -127,6 +204,11 @@ impl<L: PerfReadingLabels> PerfEvent<L> {
         PerfEvent {
             counters,
             state: match std::env::var("QPE_FORMAT").as_deref() {
+                Ok("csv") => OutputState::Csv {
+                    header_written: OnceCell::new(),
+                    label_names: L::names(),
+                    writer: csv::Writer::from_writer(Box::new(stdout())),
+                },
                 x => {
                     if let Ok(requested) = x {
                         eprintln!("unrecognized value for QPE_FORMAT: {requested:?}");

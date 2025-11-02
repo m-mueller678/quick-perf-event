@@ -1,4 +1,4 @@
-use quick_perf_event::{PerfEvent, perf_reading_labels};
+use quick_perf_event::{PerfEvent, TabledFloat, perf_reading_labels};
 use rand::{SeedableRng, rng, rngs::SmallRng, seq::SliceRandom};
 use std::mem;
 
@@ -21,7 +21,7 @@ fn walk_ptr_loop(steps: usize, size: usize, qpe: &mut PerfEvent<Labels>) {
     qpe.run(
         steps,
         Labels {
-            size: size.to_string(),
+            size: TabledFloat(size as f64).to_string(),
         },
         || {
             for _ in 0..steps {

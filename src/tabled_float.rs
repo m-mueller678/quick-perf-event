@@ -6,7 +6,6 @@ impl fmt::Display for TabledFloat {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let scale = self.0.log10().floor() as isize;
         let si_scale = scale.div_euclid(3);
-        dbg!(self.0, scale, si_scale);
         if !self.0.is_finite() || self.0.is_sign_negative() {
             write!(f, "{:7.0e}", self.0)
         } else if scale >= -2 && scale <= 2 {

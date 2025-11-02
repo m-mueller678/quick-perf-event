@@ -22,55 +22,61 @@ macro_rules! perf_reading_labels {
 }
 
 mod perf_counters;
+mod streaming_table;
 mod tabled_float;
 
-use crate::perf_counters::{PerfCounters, PerfReading};
+pub use crate::tabled_float::TabledFloat;
+pub use perf_counters::{PerfCounters, PerfReading};
+#[doc(hidden)]
+pub use streaming_table::StreamingTable;
+
 use perf_event::CounterData;
 use std::{
-    cell::OnceCell,
+    error::Error,
     io::{Write, stdout},
     iter,
     marker::PhantomData,
     mem,
+    sync::Once,
     time::SystemTime,
 };
 use tabled::settings::Style;
 
 pub struct PerfEvent<L> {
+    inner: PerfEvent2,
+    _p: PhantomData<L>,
+}
+
+struct PerfEvent2 {
     counters: PerfCounters,
     state: OutputState,
-    _p: PhantomData<L>,
+    label_names: &'static [&'static str],
 }
 
 enum OutputState {
     Tabled {
         readings: Vec<PerfReadingExtra>,
-        label_names: &'static [&'static str],
         markdown: bool,
     },
     Interactive {
-        header_written: OnceCell<()>,
-        label_names: &'static [&'static str],
+        table: StreamingTable,
     },
     Csv {
-        header_written: OnceCell<()>,
-        label_names: &'static [&'static str],
+        header_written: bool,
         writer: csv::Writer<Box<dyn Write>>,
     },
 }
 
-impl OutputState {
+impl PerfEvent2 {
     fn push(
         &mut self,
         scale: usize,
         _start_time: SystemTime,
-        counters: &mut PerfCounters,
         labels: &mut dyn FnMut(&mut dyn FnMut(&str)),
-    ) {
-        match self {
+    ) -> Result<(), Box<dyn Error>> {
+        match &mut self.state {
             OutputState::Tabled {
                 readings,
-                label_names: _,
                 markdown: _,
             } => {
                 let mut label_vec = Vec::new();
@@ -78,58 +84,72 @@ impl OutputState {
                 readings.push(PerfReadingExtra {
                     scale,
                     labels: label_vec,
-                    counters: counters.read_counters(),
+                    counters: self.counters.read_counters(),
                 });
             }
-            OutputState::Interactive {
-                header_written,
-                label_names,
-            } => todo!(),
+            OutputState::Interactive { table } => {
+                if !table.table_started() {
+                    for name in self.label_names {
+                        table.push(name.to_string())?;
+                    }
+                    for val in Self::value_names(&self.counters) {
+                        table.push(val.to_string())?;
+                    }
+                }
+                let mut err = Ok(());
+                labels(&mut |label| {
+                    if err.is_ok() {
+                        err = table.push(label.to_string());
+                    }
+                });
+                err?;
+                let mut discard_multiplexed = false;
+                for val in Self::values(
+                    &self.counters.read_counters(),
+                    scale,
+                    &mut discard_multiplexed,
+                ) {
+                    table.push(TabledFloat(val).to_string())?;
+                }
+            }
             OutputState::Csv {
                 header_written,
-                label_names,
                 writer,
             } => {
-                let mut err = Ok(());
                 macro_rules! write_field {
                     ($x:expr) => {
-                        if err.is_ok() {
-                            err = writer.write_field($x);
-                        }
+                        writer.write_field($x)?;
                     };
                 }
-                header_written.get_or_init(|| {
-                    for l in label_names.iter() {
+                if !*header_written {
+                    *header_written = true;
+                    for l in self.label_names {
                         write_field!(l);
                     }
-                    for name in counters.names() {
+                    for name in Self::value_names(&self.counters) {
                         write_field!(name);
                     }
                     write_field!("multiplexed");
+                    writer.write_record(iter::empty::<&[u8]>())?;
+                }
+                let mut err = Ok(());
+                labels(&mut |l| {
                     if err.is_ok() {
-                        err = writer.write_record(iter::empty::<&[u8]>());
+                        err = writer.write_field(l);
                     }
                 });
-                labels(&mut |l| {
-                    write_field!(l);
-                });
-                let reading = counters.read_counters();
+                err?;
+                let reading = self.counters.read_counters();
                 let mut any_multiplexed = false;
-                for counter in &reading.counters {
-                    let (scaled, multiplexed) = Self::process_counter(counter, scale);
-                    any_multiplexed |= multiplexed;
-                    write_field!(&format!("{scaled}"));
+                for value in Self::values(&reading, scale, &mut any_multiplexed) {
+                    write_field!(&format!("{value}"));
                 }
                 write_field!(&format!("{any_multiplexed}"));
-                if err.is_ok() {
-                    err = writer.write_record(iter::empty::<&[u8]>());
-                }
-                if err.is_ok() {
-                    err = writer.flush().map_err(Into::into);
-                }
-                Self::handle_csv_result(err);
+                writer.write_record(iter::empty::<&[u8]>())?;
+                writer.flush()?;
             }
         }
+        Ok(())
     }
 
     fn process_counter(counter: &CounterData, scale: usize) -> (f64, bool) {
@@ -140,21 +160,20 @@ impl OutputState {
         (scaled, multiplexed)
     }
 
-    fn handle_csv_result(err: csv::Result<()>) {
+    fn report_error(err: Result<(), Box<dyn Error>>) {
+        static ONCE: Once = Once::new();
         if let Err(err) = err {
-            eprintln!("error writing csv: {err}");
+            ONCE.call_once(|| {
+                eprintln!("QPE failed to write. Future errors will not be reported. {err}");
+            });
         }
     }
 
-    fn dump_and_reset(&mut self, counters: &PerfCounters) {
-        match self {
-            OutputState::Tabled {
-                readings,
-                label_names,
-                markdown,
-            } => {
+    fn dump_and_reset(&mut self) {
+        match &mut self.state {
+            OutputState::Tabled { readings, markdown } => {
                 let mut table = tabled::builder::Builder::new();
-                table.push_record(label_names.iter().copied());
+                table.push_record(self.label_names.iter().copied());
                 for reading in &mut *readings {
                     table.push_record(mem::take(&mut reading.labels));
                 }
@@ -162,7 +181,7 @@ impl OutputState {
                     .iter()
                     .flat_map(|x| x.counters.counters.iter())
                     .any(|x| x.time_enabled() != x.time_running());
-                for (i, name) in counters.names().enumerate() {
+                for (i, name) in self.counters.names().enumerate() {
                     let readings = || {
                         readings.iter().map(|x| {
                             let c = &x.counters.counters[i];
@@ -190,19 +209,35 @@ impl OutputState {
                 }
                 println!("{multiplex_warning}{table}");
             }
-            OutputState::Interactive {
-                header_written,
-                label_names,
-            } => todo!(),
+            OutputState::Interactive { table } => {
+                Self::report_error(table.end_table().map_err(Into::into));
+            }
             OutputState::Csv {
                 header_written,
-                label_names: _,
-                writer,
+                writer: _,
             } => {
-                header_written.take();
-                Self::handle_csv_result(writer.flush().map_err(Into::into));
+                *header_written = false;
             }
         }
+    }
+
+    fn value_names(counters: &PerfCounters) -> impl Iterator<Item = &str> {
+        ["time", "scale"].into_iter().chain(counters.names())
+    }
+
+    fn values(
+        counters: &PerfReading,
+        scale: usize,
+        any_multiplexed: &mut bool,
+    ) -> impl Iterator<Item = f64> {
+        let time = counters.duration.as_secs_f64();
+        let counters = counters.counters.iter();
+        let counters = counters.map(move |x| {
+            let x = Self::process_counter(x, scale);
+            *any_multiplexed |= x.1;
+            x.0
+        });
+        [time, scale as f64].into_iter().chain(counters)
     }
 }
 
@@ -225,33 +260,38 @@ impl<L: PerfReadingLabels> PerfEvent<L> {
 
     pub fn with_counters(counters: PerfCounters) -> Self {
         PerfEvent {
-            counters,
-            state: match std::env::var("QPE_FORMAT").as_deref() {
-                Ok("csv") => OutputState::Csv {
-                    header_written: OnceCell::new(),
-                    label_names: L::names(),
-                    writer: csv::Writer::from_writer(Box::new(stdout())),
-                },
-                x => {
-                    let mut markdown = false;
-                    match x {
-                        Ok("md") => {
-                            markdown = true;
-                        }
-                        Ok(requested) => {
-                            eprintln!(
-                                "unrecognized value for QPE_FORMAT: {requested:?}.\nSupported values: csv, md"
-                            );
-                        }
-                        Err(_) => {}
-                    }
-                    OutputState::Tabled {
+            inner: PerfEvent2 {
+                state: match std::env::var("QPE_FORMAT").as_deref() {
+                    Ok("csv") => OutputState::Csv {
+                        header_written: false,
+                        writer: csv::Writer::from_writer(Box::new(stdout())),
+                    },
+                    Ok("md") => OutputState::Tabled {
                         readings: Vec::new(),
-                        label_names: L::names(),
-                        markdown,
+                        markdown: true,
+                    },
+                    x => {
+                        match x {
+                            Ok(requested) => {
+                                eprintln!(
+                                    "unrecognized value for QPE_FORMAT: {requested:?}.\nSupported values: csv, md"
+                                );
+                            }
+                            Err(_) => {}
+                        }
+                        OutputState::Interactive {
+                            table: StreamingTable::new(
+                                L::names().len() + 2 + counters.names().count(),
+                                9,
+                                160,
+                            ),
+                        }
                     }
-                }
+                },
+                counters,
+                label_names: L::names(),
             },
+
             _p: PhantomData,
         }
     }
@@ -261,14 +301,14 @@ impl<L: PerfReadingLabels> PerfEvent<L> {
         L: PerfReadingLabels,
     {
         let start_time = SystemTime::now();
-        self.counters.reset();
-        self.counters.enable();
+        self.inner.counters.reset();
+        self.inner.counters.enable();
         let ret = f();
-        self.counters.disable();
-        self.state
-            .push(scale, start_time, &mut self.counters, &mut |dst| {
-                labels.values(dst)
-            });
+        self.inner.counters.disable();
+        PerfEvent2::report_error(
+            self.inner
+                .push(scale, start_time, &mut |dst| labels.values(dst)),
+        );
         ret
     }
 }
@@ -278,8 +318,8 @@ pub trait PerfReadingLabels {
     fn values(&self, f: &mut dyn FnMut(&str));
 }
 
-impl<L> Drop for PerfEvent<L> {
+impl Drop for PerfEvent2 {
     fn drop(&mut self) {
-        self.state.dump_and_reset(&mut self.counters);
+        self.dump_and_reset();
     }
 }

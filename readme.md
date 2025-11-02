@@ -1,7 +1,4 @@
 # quick_perf_event
-
-## Quick Perf Event
-
 This crate provides a lightweight framework for measuring and reporting performance
 counters across labeled workloads or benchmarks.
 The output format can be controlled using the `QPE_FORMAT` environment variable:
@@ -15,7 +12,7 @@ The output format can be controlled using the `QPE_FORMAT` environment variable:
 - **`QPE_FORMAT=csv`** - Streams results as **CSV** records to stdout, suitable for
   further processing.
 
-### Example
+## Example
 This benchmark measures computing the sum of an iterator.
 ```rust
 use quick_perf_event::QuickPerfEvent;
@@ -48,7 +45,7 @@ You can change this value until the next reboot using `sudo sysctl -w kernel.per
 Lower values mean more permissive handling.
 See [`man 2 perf_event_open`](https://www.man7.org/linux/man-pages/man2/perf_event_open.2.html) for what the different restriction levels mean.
 
-### Usage
+## Usage
 To start benchmarking, you first need a [`QuickPerfEvent`] object.
 [`QuickPerfEvent`] manages both recording and reporting of benchmarks.
 You may configure the set of performance counters using either the environment variable `QPE_EVENTS` or [`with_counters`](QuickPerfEvent::with_counters).

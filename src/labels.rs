@@ -30,10 +30,10 @@ macro_rules! struct_labels {
     };
 }
 
-/// A trait for sets of labels attached to a performance measurements.
+/// A trait for sets of labels attached to a performance measurement.
 ///
-/// Implementors describe both the **schema** (via [`names`](Self::names))
-/// and **values** (via [`values`](Self::values)) of a label set.
+/// Implementors describe both the schema (via [`names`](Self::names))
+/// and values (via [`values`](Self::values)) of a label set.
 /// You can define a label struct conveniently using the
 /// [`struct_labels!`](crate::struct_labels) macro.
 pub trait Labels {

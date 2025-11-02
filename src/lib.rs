@@ -11,7 +11,7 @@
 //! - **`QPE_FORMAT=md`** - Generates a **Markdown table** after all runs have completed,
 //!   choosing column widths automatically for clean, publication-ready output.
 //! - **`QPE_FORMAT=csv`** - Streams results as **CSV** records to stdout, suitable for
-//!   further processsing.
+//!   further processing.
 //!
 //! ## Example
 //! ```
@@ -25,21 +25,21 @@
 //!│   sum   │   0.194 │   1.0 G │   1.007 │ 364.0 n │ 166.0 n │ 345.0 n │
 //!└─────────┴─────────┴─────────┴─────────┴─────────┴─────────┴─────────┘
 //! ```
-//! This will produce somethinglike the above.
-//! Note that the program was unable to record the number of cpu cycles spent in the kernel.
+//! This will produce something like the above.
+//! Note that the program was unable to record the number of CPU cycles spent in the kernel.
 //! If you run into similar issues, you may need to configure `perf_event_paranoid`.
-//! See [`man 2 perf_event_open`](https://www.man7.org/linux/man-pages/man2/perf_event_open.2.html) for what the different restiction levels mean.
+//! See [`man 2 perf_event_open`](https://www.man7.org/linux/man-pages/man2/perf_event_open.2.html) for what the different restriction levels mean.
 //!
 //! Performance counters are divided by the scale passed to the [`record`](PerfReading::record) method to give the number of events per operation.
-//! The `time` column reports the wall-time in seconds elapsed over the emasurement.
+//! The `time` column reports the wall-time in seconds elapsed over the measurement.
 //! It is not normalized.
 //!
 //! ## Usage
-//! To start benchmarking you first need a [`QuickPerfEvent`] object.
-//! [`QuickPerfEvent`] manmanages both recording and reporting of benchmarks.
+//! To start benchmarking, you first need a [`QuickPerfEvent`] object.
+//! [`QuickPerfEvent`] manages both recording and reporting of benchmarks.
 //! You may configure the set of performance counters using either the environment variable `QPE_EVENTS` or [`with_counters`](QuickPerfEvent::with_counters).
 //! For basic usage, you should prefer `QPE_EVENTS`.
-//! For example, to count cpu cycles and branch misses, set it to `cycles,br-miss`.
+//! For example, to count CPU cycles and branch misses, set it to `cycles,br-miss`.
 //! For an up-to-date list of supported values see the implementation of [`with_counter_names`](PerfCounters::with_counter_names).
 //! If your program is multi-threaded, construct [`QuickPerfEvent`] **before spawning threads** to ensure counts include other threads.
 //!
@@ -62,7 +62,7 @@
 //!   - or a user-defined struct implementing [`Labels`].
 //!
 //! # Environment Variables
-//! Quick Perf Event can be configured using arious environment variables.
+//! Quick Perf Event can be configured using various environment variables.
 //! - **`QPE_FORMAT`** - set the output format, see above.
 //! - **`QPE_EVENTS`** - set the counters recorded by a default [PerfCounters] instance.
 //! - **`QPE_LINE_LEN`** - override the line length used for line wrapping live tables. If not set, terminal size is detected automatically.
@@ -364,7 +364,7 @@ impl PerfEventInner {
                     );
                 }
                 let multiplex_warning = if multiplexed {
-                    "⚠️ Some counter were multiplexed.\n"
+                    "⚠️ Some counters were multiplexed.\n"
                 } else {
                     "\n"
                 };

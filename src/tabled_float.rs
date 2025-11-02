@@ -4,12 +4,12 @@ use std::fmt;
 ///
 /// `TabledFloat` formats values with fixed width (7 characters)
 /// and uses SI unit prefixes (`m`, `µ`, `n`, `p`, `k`, `M`, `G`, `T`).
-/// It is intended to allow easy comparison of values accross rows while remaining compact.
+/// It is intended to allow easy comparison of values across rows while remaining compact.
 /// For values with a reasonable magnitude, it shows at least two digits of precision.
 /// This is the format used for the `live` output format.
 ///
 /// # Formatting rules
-/// - negative and non-finite values use an unspecified format with appropriate width.
+/// - Negative and non-finite values use an unspecified format with appropriate width
 /// - Values close to 1 are printed as fixed-point with three decimals (`100.000`, `0.010`)
 /// - Larger or smaller magnitudes are scaled with SI prefixes, leaving only one digit past the decimal point (`1.0 k`, `500.0 µ`)
 /// - Very large values are formatted using scientific notation (`5e42`)

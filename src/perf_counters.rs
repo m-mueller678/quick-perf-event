@@ -4,7 +4,7 @@ use perf_event::{
 };
 use std::time::{Duration, Instant};
 
-/// A  wrapper containing [`perf_event`] counters for use in [QuickPerfEvent](crate::QuickPerfEvent).
+/// A wrapper containing [`perf_event`] counters for use in [QuickPerfEvent](crate::QuickPerfEvent).
 ///
 /// Note that this crate uses the `perf-event` crate from the `perf-event2` package, not the `perf-event` package.
 ///
@@ -41,7 +41,8 @@ impl PerfCounters {
 
     /// Builds a [`PerfCounters`] instance from a list of event names.
     ///
-    /// These event names are not standard names, they are aliases for counter configurations defined by this crate.
+    /// These event names are not standard names.
+    /// They are aliases for counter configurations defined by this crate.
     /// The names are chosen to fit in the output format table without line-wrapping.
     ///
     /// Invalid names and counters that cannot be opened (e.g. due to permission issues) are skipped with a warning message to stderr.
@@ -88,7 +89,7 @@ impl PerfCounters {
             time: Ok(Duration::ZERO),
         }
     }
-    /// Constructs a [`PerfCounters`] instance from a set of counteres.
+    /// Constructs a [`PerfCounters`] instance from a set of counters.
     ///
     /// Each counter may be associated with a name.
     /// Counters without a name will be affected by [`enable`](Self::enable), [`disable`](Self::disable), and [`reset`](Self::reset), but their values will not be recorded.
@@ -164,9 +165,9 @@ impl PerfCounters {
 ///
 /// Contains the total measurement duration and raw counter data for each event.
 pub struct PerfCountersReading {
-    /// Total time elapsed while the counters where enabled.
+    /// Total time elapsed while the counters were enabled.
     pub duration: Duration,
     /// Collected [`CounterData`] values for each enabled counter.
-    /// The values are in the same order as the names reutned by [`PerfCounters::names`].
+    /// The values are in the same order as the names returned by [`PerfCounters::names`].
     pub counters: Vec<CounterData>,
 }

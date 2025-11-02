@@ -18,16 +18,16 @@ fn walk_ptr_loop(steps: usize, size: usize, qpe: &mut PerfEvent<Labels>) {
     }
     let mut i = 0;
     let mut sum = 0;
-    qpe.run(
+    qpe.run(|| {
+        for _ in 0..steps {
+            sum += i;
+            i = access_sequence[i];
+        }
+    })
+    .record(
         steps,
         Labels {
             size: TabledFloat(size as f64).to_string(),
-        },
-        || {
-            for _ in 0..steps {
-                sum += i;
-                i = access_sequence[i];
-            }
         },
     )
 }

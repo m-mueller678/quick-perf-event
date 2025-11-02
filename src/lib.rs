@@ -23,8 +23,15 @@ use std::{
 use tabled::settings::Style;
 
 pub struct PerfEvent<L> {
-    inner: PerfEvent2,
+    inner: PerfEventInner,
     _p: PhantomData<L>,
+}
+
+#[must_use]
+pub struct PerfEventResult<'a, L, T> {
+    pe: &'a mut PerfEvent<L>,
+    start_time: SystemTime,
+    ret: T,
 }
 
 impl<L: Labels> Default for PerfEvent<L> {
@@ -40,38 +47,44 @@ impl<L: Labels> PerfEvent<L> {
 
     pub fn with_counters(counters: PerfCounters) -> Self {
         PerfEvent {
-            inner: PerfEvent2::new(counters, L::names()),
+            inner: PerfEventInner::new(counters, L::names()),
             _p: PhantomData,
         }
     }
 
-    pub fn run<R>(&mut self, scale: usize, labels: impl Borrow<L>, f: impl FnOnce() -> R) -> R
-    where
-        L: Labels,
-    {
+    pub fn run<R>(&mut self, f: impl FnOnce() -> R) -> PerfEventResult<'_, L, R> {
         let start_time = SystemTime::now();
         self.inner.counters.reset();
         self.inner.counters.enable();
         let ret = f();
         self.inner.counters.disable();
-        PerfEvent2::report_error(
-            self.inner
-                .push(scale, start_time, &mut |dst| labels.borrow().values(dst)),
-        );
-        ret
+        PerfEventResult {
+            start_time,
+            ret,
+            pe: self,
+        }
     }
 }
 
-impl Drop for PerfEvent2 {
-    fn drop(&mut self) {
-        self.dump_and_reset();
+impl<L: Labels, T> PerfEventResult<'_, L, T> {
+    pub fn record(self, scale: usize, labels: impl Borrow<L>) -> T {
+        PerfEventInner::report_error(self.pe.inner.push(scale, self.start_time, &mut |dst| {
+            labels.borrow().values(dst)
+        }));
+        self.ret
     }
 }
 
-struct PerfEvent2 {
+struct PerfEventInner {
     counters: PerfCounters,
     state: OutputState,
     label_names: &'static [&'static str],
+}
+
+impl Drop for PerfEventInner {
+    fn drop(&mut self) {
+        self.dump_and_reset();
+    }
 }
 
 enum OutputState {
@@ -88,9 +101,9 @@ enum OutputState {
     },
 }
 
-impl PerfEvent2 {
+impl PerfEventInner {
     fn new(counters: PerfCounters, label_names: &'static [&'static str]) -> Self {
-        PerfEvent2 {
+        PerfEventInner {
             state: match std::env::var("QPE_FORMAT").as_deref() {
                 Ok("csv") => OutputState::Csv {
                     header_written: false,

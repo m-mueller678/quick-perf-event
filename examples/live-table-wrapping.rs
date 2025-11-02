@@ -1,11 +1,11 @@
-use quick_perf_event::StreamingTable;
+use quick_perf_event::LiveTable;
 
 fn print_table<'a>(
     column_count: usize,
     line_width: usize,
     contents: impl Iterator<Item = &'a str>,
 ) {
-    let mut table = StreamingTable::new(column_count, 7, line_width);
+    let mut table = LiveTable::new(column_count, 7, line_width);
     for cell in contents {
         table.push(cell.to_string()).unwrap();
     }

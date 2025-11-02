@@ -61,19 +61,19 @@
 //!   - a string `&str` (single label),
 //!   - or a user-defined struct implementing [`Labels`].
 mod labels;
+mod live_table;
 mod perf_counters;
-mod streaming_table;
 mod tabled_float;
 
 pub use labels::Labels;
+pub use live_table::LiveTable;
 pub use perf_counters::{PerfCounters, PerfCountersReading};
-#[doc(hidden)]
-pub use streaming_table::StreamingTable;
 pub use tabled_float::TabledFloat;
 
 use perf_event::CounterData;
 use std::{
     borrow::Borrow,
+    env,
     error::Error,
     io::{Write, stdout},
     iter,
@@ -174,8 +174,8 @@ enum OutputState {
         readings: Vec<PerfReadingExtra>,
         markdown: bool,
     },
-    Interactive {
-        table: StreamingTable,
+    Live {
+        table: LiveTable,
     },
     Csv {
         header_written: bool,
@@ -204,11 +204,21 @@ impl PerfEventInner {
                         }
                         Err(_) => {}
                     }
-                    OutputState::Interactive {
-                        table: StreamingTable::new(
+                    OutputState::Live {
+                        table: LiveTable::new(
                             label_names.len() + 2 + counters.names().count(),
                             9,
-                            160,
+                            env::var("QPE_LINE_LEN")
+                                .ok()
+                                .and_then(|x| {
+                                    x.parse()
+                                        .map_err(|_| {
+                                            eprintln!("failed to parse line len: {x:?}");
+                                        })
+                                        .ok()
+                                })
+                                .or_else(|| terminal_size::terminal_size().map(|x| x.0.0 as usize))
+                                .unwrap_or(160),
                         ),
                     }
                 }
@@ -236,7 +246,7 @@ impl PerfEventInner {
                     counters: self.counters.read_counters(),
                 });
             }
-            OutputState::Interactive { table } => {
+            OutputState::Live { table } => {
                 if !table.table_started() {
                     for name in self.label_names {
                         table.push(name.to_string())?;
@@ -358,7 +368,7 @@ impl PerfEventInner {
                 }
                 println!("{multiplex_warning}{table}");
             }
-            OutputState::Interactive { table } => {
+            OutputState::Live { table } => {
                 Self::report_error(table.end_table().map_err(Into::into));
             }
             OutputState::Csv {

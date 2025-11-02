@@ -3,7 +3,10 @@ use std::{
     iter,
 };
 
-pub struct StreamingTable {
+/// This is exported for use in examples and not considered part of the public API.
+/// Users should not rely on it.
+#[doc(hidden)]
+pub struct LiveTable {
     column_count: usize,
     columns_per_line: usize,
     cell_size: usize,
@@ -15,12 +18,13 @@ pub struct StreamingTable {
     field_separator: &'static str,
 }
 
-impl StreamingTable {
+impl LiveTable {
     pub fn new(column_count: usize, cell_size: usize, line_width: usize) -> Self {
+        dbg!(line_width);
         let columns_per_line = ((line_width - 1) / (cell_size + 1)).max(1);
         assert!(column_count > 0);
         assert!(cell_size > 2);
-        let mut ret = StreamingTable {
+        let mut ret = LiveTable {
             column_count,
             columns_per_line,
             cell_size,

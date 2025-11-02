@@ -8,6 +8,7 @@ perf-event2="0.7.4"
 tabled = {version = "0.20.0",default-features = false,features = ["std"]}
 csv = "1.4"
 textwrap = {version = "0.16.2",default-features = false,features = ["unicode-width","unicode-linebreak"]}
+terminal_size = "0.4.3"
 
 [dev-dependencies]
 rand = "0.9"

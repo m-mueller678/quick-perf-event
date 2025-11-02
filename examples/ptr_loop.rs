@@ -1,3 +1,9 @@
+//! This example implements a simple pointer chasing benchmark for measuring cache latency.
+//! An array of indexes forms a random loop of indirection of a specified size.
+//! As the position of each array access is determined by the index loaded in the previous access,
+//! the load can only be started after the previous load completes.
+//! Therefore, each loop iteration takes roughtly as long as the access latency.
+
 use quick_perf_event::{QuickPerfEvent, TabledFloat, struct_labels};
 use rand::{SeedableRng, rng, rngs::SmallRng, seq::SliceRandom};
 use std::mem;

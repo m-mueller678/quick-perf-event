@@ -1,10 +1,72 @@
+//! # Quick Perf Event
+//!
+//! This crate provides a lightweight framework for measuring and reporting performance
+//! counters across labeled workloads or benchmarks.
+//! The output format can be controlled using the `QPE_FORMAT` environment variable:
+//!
+//! - `QPE_FORMAT=live` (default) — Uses **live table mode**, designed for development and
+//!   debugging. Each result is printed as soon as it’s available, with compact,
+//!   fixed-width, line-wrapped cells to fit many columns in narrow terminals.
+//!   If the requested columns still do not fit, table rows are line wrapped as well.
+//! - `QPE_FORMAT=md` — Generates a **Markdown table** after all runs have completed,
+//!   choosing column widths automatically for clean, publication-ready output.
+//! - `QPE_FORMAT=csv` — Streams results as **CSV** records to stdout, suitable for
+//!   further processsing.
+//!
+//! ## Example
+//! ```
+#![doc = include_str!("../examples/short.rs")]
+//! ```
+//! ```text
+//!failed to create counter "kcycle": Permission denied (os error 13)
+//!┌─────────┬─────────┬─────────┬─────────┬─────────┬─────────┬─────────┐
+//!│  label  │  time   │  scale  │  cycle  │ l1-miss │llc-miss │ br-miss │
+//!├─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┤
+//!│   sum   │   0.194 │   1.0 G │   1.007 │ 364.0 n │ 166.0 n │ 345.0 n │
+//!└─────────┴─────────┴─────────┴─────────┴─────────┴─────────┴─────────┘
+//! ```
+//! This will produce somethinglike the above.
+//! Note that the program was unable to record the number of cpu cycles spent in the kernel.
+//! If you run into similar issues, you may need to configure `perf_event_paranoid`.
+//! See [`man 2 perf_event_open`](https://www.man7.org/linux/man-pages/man2/perf_event_open.2.html) for what the different restiction levels mean.
+//!
+//! Performance counters are divided by the scale passed to the [`record`](PerfReading::record) method to give the number of events per operation.
+//! The `time` column reports the wall-time in seconds elapsed over the emasurement.
+//! It is not normalized.
+//!
+//! ## Usage
+//! To start benchmarking you first need a [`QuickPerfEvent`] object.
+//! [`QuickPerfEvent`] manmanages both recording and reporting of benchmarks.
+//! You may configure the set of performance counters using either the environment variable `QPE_EVENTS` or [`with_counters`](QuickPerfEvent::with_counters).
+//! For basic usage, you should prefer `QPE_EVENTS`.
+//! For example, to count cpu cycles and branch misses, set it to `cycles,br-miss`.
+//! For an up-to-date list of supported values see the implementation of [`with_counter_names`](PerfCounters::with_counter_names).
+//! If your program is multi-threaded, construct [`QuickPerfEvent`] **before spawning threads** to ensure counts include other threads.
+//!
+//! Now that you have a [`QuickPerfEvent`] object, you may start taking measurements using its [`run`](QuickPerfEvent::run) method.
+//! After each run, you **must** call [`record`](PerfReading::record) on the returned value to log the measurement.
+//! The [`record`](PerfReading::record) method takes two parameters:
+//!
+//! - **`scale`** – a normalization factor (e.g. number of iterations).  
+//!   All performance counters are divided by this value, producing results
+//!   such as *branch misses per operation* or *cycles per iteration*.
+//!   Note that the time column is not normalized.
+//!   It reports the absolute amount of time elapsed over the measurement.
+//!   Dividing this by scale would be misleading when multiple threads are involved.
+//!   If you want a measure of time spent per operation, consider using the task clock counter `t-clock`.
+//!
+//! - **`labels`** – metadata describing the measurement.  
+//!   This can be:
+//!   - the unit type `()` (no labels),
+//!   - a string `&str` (single label),
+//!   - or a user-defined struct implementing [`Labels`].
 mod labels;
 mod perf_counters;
 mod streaming_table;
 mod tabled_float;
 
 pub use labels::Labels;
-pub use perf_counters::{PerfCounters, PerfReading};
+pub use perf_counters::{PerfCounters, PerfCountersReading};
 #[doc(hidden)]
 pub use streaming_table::StreamingTable;
 pub use tabled_float::TabledFloat;
@@ -22,43 +84,59 @@ use std::{
 };
 use tabled::settings::Style;
 
-pub struct PerfEvent<L> {
+/// Main entry point for performance measurement.
+///
+/// `QuickPerfEvent` encapsulates a collection of hardware performance counters (`PerfCounters`) and configuration for reporting results.
+/// See the crate level documentation for more information.
+///
+/// The generic parameter `L` must implement [`Labels`], providing a fixed schema
+/// of label names and values for each recorded sample.
+/// [`Labels`] is implemented for `()` and `str`.
+/// You can define a label struct conveniently using the
+/// [`struct_labels!`](crate::struct_labels) macro.
+pub struct QuickPerfEvent<L: ?Sized> {
     inner: PerfEventInner,
     _p: PhantomData<L>,
 }
 
+/// See [`QuickPerfEvent::run`] and the crate level docs.
 #[must_use]
-pub struct PerfEventResult<'a, L, T> {
-    pe: &'a mut PerfEvent<L>,
+pub struct PerfReading<'a, L: ?Sized, T> {
+    pe: &'a mut QuickPerfEvent<L>,
     start_time: SystemTime,
     ret: T,
 }
 
-impl<L: Labels> Default for PerfEvent<L> {
+impl<L: Labels + ?Sized> Default for QuickPerfEvent<L> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<L: Labels> PerfEvent<L> {
+impl<L: Labels + ?Sized> QuickPerfEvent<L> {
+    /// Create a `QuickPerfEvent` configured from environment variables.
     pub fn new() -> Self {
         Self::with_counters(PerfCounters::new())
     }
 
+    /// Create a `QuickPerfEvent` with a custom set of performance counters.
     pub fn with_counters(counters: PerfCounters) -> Self {
-        PerfEvent {
+        QuickPerfEvent {
             inner: PerfEventInner::new(counters, L::names()),
             _p: PhantomData,
         }
     }
 
-    pub fn run<R>(&mut self, f: impl FnOnce() -> R) -> PerfEventResult<'_, L, R> {
+    /// Perform a measurement.
+    ///
+    /// You **must** call [`record`](PerfReading::record) on the returned value.
+    pub fn run<R>(&mut self, f: impl FnOnce() -> R) -> PerfReading<'_, L, R> {
         let start_time = SystemTime::now();
         self.inner.counters.reset();
         self.inner.counters.enable();
         let ret = f();
         self.inner.counters.disable();
-        PerfEventResult {
+        PerfReading {
             start_time,
             ret,
             pe: self,
@@ -66,7 +144,11 @@ impl<L: Labels> PerfEvent<L> {
     }
 }
 
-impl<L: Labels, T> PerfEventResult<'_, L, T> {
+impl<L: Labels + ?Sized, T> PerfReading<'_, L, T> {
+    /// Records the measured result.
+    ///
+    /// The `scale` argument normalizes counter values (e.g. per iteration count).
+    /// The given `labels` instance supplies the labels for this sample.
     pub fn record(self, scale: usize, labels: impl Borrow<L>) -> T {
         PerfEventInner::report_error(self.pe.inner.push(scale, self.start_time, &mut |dst| {
             labels.borrow().values(dst)
@@ -293,7 +375,7 @@ impl PerfEventInner {
     }
 
     fn values(
-        counters: &PerfReading,
+        counters: &PerfCountersReading,
         scale: usize,
         any_multiplexed: &mut bool,
     ) -> impl Iterator<Item = f64> {
@@ -311,5 +393,5 @@ impl PerfEventInner {
 struct PerfReadingExtra {
     scale: usize,
     labels: Vec<String>,
-    counters: PerfReading,
+    counters: PerfCountersReading,
 }

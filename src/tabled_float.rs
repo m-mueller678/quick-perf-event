@@ -1,5 +1,19 @@
 use std::fmt;
 
+/// A wrapper type for rendering floating-point numbers in compact, readable form for tables.
+///
+/// `TabledFloat` formats values with fixed width (7 characters)
+/// and uses SI unit prefixes (`m`, `µ`, `n`, `p`, `k`, `M`, `G`, `T`).
+/// It is intended to allow easy comparison of values accross rows while remaining compact.
+/// For values with a reasonable magnitude, it shows at least two digits of precision.
+/// This is the format used for the `live` output format.
+///
+/// # Formatting rules
+/// - negative and non-finite values use an unspecified format with appropriate width.
+/// - Values close to 1 are printed as fixed-point with three decimals (`100.000`, `0.010`)
+/// - Larger or smaller magnitudes are scaled with SI prefixes, leaving only one digit past the decimal point (`1.0 k`, `500.0 µ`)
+/// - Very large values are formatted using scientific notation (`5e42`)
+/// - Very small values are rounded down to 0 (`0`)
 pub struct TabledFloat(pub f64);
 
 impl fmt::Display for TabledFloat {
@@ -54,6 +68,7 @@ fn test_fixed_float() {
         (1e+3, "  1.0 k"),
         (5e+3, "  5.0 k"),
         (1e+4, " 10.0 k"),
+        (5e+42, "   5e42"),
         (1e+105, "  1e105"),
     ];
     for x in cases {

@@ -1,4 +1,4 @@
-use quick_perf_event::{PerfEvent, TabledFloat, struct_labels};
+use quick_perf_event::{QuickPerfEvent, TabledFloat, struct_labels};
 use rand::{SeedableRng, rng, rngs::SmallRng, seq::SliceRandom};
 use std::mem;
 
@@ -8,7 +8,7 @@ struct_labels! {
     }
 }
 
-fn walk_ptr_loop(steps: usize, size: usize, qpe: &mut PerfEvent<Labels>) {
+fn walk_ptr_loop(steps: usize, size: usize, qpe: &mut QuickPerfEvent<Labels>) {
     let n = size / mem::size_of::<usize>();
     let mut access_sequence: Vec<usize> = (0..n).collect();
     access_sequence.shuffle(&mut SmallRng::from_rng(&mut rng()));
@@ -33,7 +33,7 @@ fn walk_ptr_loop(steps: usize, size: usize, qpe: &mut PerfEvent<Labels>) {
 }
 
 fn main() {
-    let mut qpe = PerfEvent::new();
+    let mut qpe = QuickPerfEvent::new();
     for scale in (12..20).chain((21..30).step_by(2)) {
         walk_ptr_loop(40_000_000, 1 << scale, &mut qpe);
     }

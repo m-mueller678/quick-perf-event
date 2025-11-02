@@ -1,4 +1,4 @@
-use quick_perf_event::{PerfEvent, struct_labels};
+use quick_perf_event::{QuickPerfEvent, struct_labels};
 
 struct_labels! {
     struct Labels{
@@ -7,7 +7,7 @@ struct_labels! {
 }
 
 fn main() {
-    let mut perf = PerfEvent::<Labels>::new();
+    let mut perf = QuickPerfEvent::<Labels>::new();
     perf.run(|| {
         for i in 0..100_000 {
             std::hint::black_box(i);

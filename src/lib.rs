@@ -1,37 +1,17 @@
-#[macro_export]
-macro_rules! perf_reading_labels {
-    ($vis:vis struct $Name:ident{
-        $($fv:vis $f:ident:$F:ty,)*
-    }) => {
-        $vis struct $Name{
-            $($fv $f:$F,)*
-        }
-
-        impl $crate::PerfReadingLabels for $Name{
-            fn names()->&'static [&'static str]{
-                &[
-                    $(std::stringify!($f),)*
-                ]
-            }
-
-            fn values(&self,f:&mut dyn FnMut(&str)){
-                $(f(&self.$f);)*
-            }
-        }
-    };
-}
-
+mod labels;
 mod perf_counters;
 mod streaming_table;
 mod tabled_float;
 
-pub use crate::tabled_float::TabledFloat;
+pub use labels::Labels;
 pub use perf_counters::{PerfCounters, PerfReading};
 #[doc(hidden)]
 pub use streaming_table::StreamingTable;
+pub use tabled_float::TabledFloat;
 
 use perf_event::CounterData;
 use std::{
+    borrow::Borrow,
     error::Error,
     io::{Write, stdout},
     iter,
@@ -247,13 +227,13 @@ struct PerfReadingExtra {
     counters: PerfReading,
 }
 
-impl<L: PerfReadingLabels> Default for PerfEvent<L> {
+impl<L: Labels> Default for PerfEvent<L> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<L: PerfReadingLabels> PerfEvent<L> {
+impl<L: Labels> PerfEvent<L> {
     pub fn new() -> Self {
         Self::with_counters(PerfCounters::new())
     }
@@ -296,9 +276,9 @@ impl<L: PerfReadingLabels> PerfEvent<L> {
         }
     }
 
-    pub fn run<R>(&mut self, scale: usize, labels: L, f: impl FnOnce() -> R) -> R
+    pub fn run<R>(&mut self, scale: usize, labels: impl Borrow<L>, f: impl FnOnce() -> R) -> R
     where
-        L: PerfReadingLabels,
+        L: Labels,
     {
         let start_time = SystemTime::now();
         self.inner.counters.reset();
@@ -307,15 +287,10 @@ impl<L: PerfReadingLabels> PerfEvent<L> {
         self.inner.counters.disable();
         PerfEvent2::report_error(
             self.inner
-                .push(scale, start_time, &mut |dst| labels.values(dst)),
+                .push(scale, start_time, &mut |dst| labels.borrow().values(dst)),
         );
         ret
     }
-}
-
-pub trait PerfReadingLabels {
-    fn names() -> &'static [&'static str];
-    fn values(&self, f: &mut dyn FnMut(&str));
 }
 
 impl Drop for PerfEvent2 {

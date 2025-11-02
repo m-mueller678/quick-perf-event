@@ -1,8 +1,8 @@
-use quick_perf_event::{PerfEvent, TabledFloat, perf_reading_labels};
+use quick_perf_event::{PerfEvent, TabledFloat, struct_labels};
 use rand::{SeedableRng, rng, rngs::SmallRng, seq::SliceRandom};
 use std::mem;
 
-perf_reading_labels! {
+struct_labels! {
     struct Labels{
         size:String,
     }

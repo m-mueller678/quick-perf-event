@@ -1,6 +1,6 @@
-use quick_perf_event::{PerfEvent, perf_reading_labels};
+use quick_perf_event::{PerfEvent, struct_labels};
 
-perf_reading_labels! {
+struct_labels! {
     struct Labels{
         operation:&'static str,
     }
@@ -10,7 +10,7 @@ fn main() {
     let mut perf = PerfEvent::new();
     perf.run(
         100_000,
-        Labels {
+        &Labels {
             operation: "black_box_i",
         },
         || {
@@ -21,7 +21,7 @@ fn main() {
     );
     perf.run(
         100_000,
-        Labels {
+        &Labels {
             operation: "black_box",
         },
         || {

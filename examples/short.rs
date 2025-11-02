@@ -1,4 +1,5 @@
 use quick_perf_event::QuickPerfEvent;
+
 fn main() {
     let mut perf = QuickPerfEvent::<str>::new();
     let result = perf.run(|| {

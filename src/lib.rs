@@ -14,9 +14,13 @@
 //!   further processing.
 //!
 //! ## Example
+//! This benchmark measures computing the sum of an iterator.
 //! ```
 #![doc = include_str!("../examples/short.rs")]
 //! ```
+//! The results show that it takes about 1 CPU cycle to process each number.
+//! Practically no branch or cache misses are encountered.
+//! In total, the benchmark took around 0.2 seconds to run.
 //! ```text
 //!failed to create counter "kcycle": Permission denied (os error 13)
 //!┌─────────┬─────────┬─────────┬─────────┬─────────┬─────────┬─────────┐
@@ -25,14 +29,13 @@
 //!│   sum   │   0.194 │   1.0 G │   1.007 │ 364.0 n │ 166.0 n │ 345.0 n │
 //!└─────────┴─────────┴─────────┴─────────┴─────────┴─────────┴─────────┘
 //! ```
-//! This will produce something like the above.
-//! Note that the program was unable to record the number of CPU cycles spent in the kernel.
-//! If you run into similar issues, you may need to configure `perf_event_paranoid`.
-//! See [`man 2 perf_event_open`](https://www.man7.org/linux/man-pages/man2/perf_event_open.2.html) for what the different restriction levels mean.
 //!
-//! Performance counters are divided by the scale passed to the [`record`](PerfReading::record) method to give the number of events per operation.
-//! The `time` column reports the wall-time in seconds elapsed over the measurement.
-//! It is not normalized.
+//! # System Configuration
+//! Note that the example above was unable to record the number of CPU cycles spent in the kernel (`kcycle`).
+//! If you run into similar issues, you probably need to configure `perf_event_paranoid`.
+//! You can change this value until the next reboot using `sudo sysctl -w kernel.perf_event_paranoid=0` or permanently by adding `kernel.perf_event_paranoid = 0` to `/etc/sysctl.conf`.
+//! Lower values mean more permissive handling.
+//! See [`man 2 perf_event_open`](https://www.man7.org/linux/man-pages/man2/perf_event_open.2.html) for what the different restriction levels mean.
 //!
 //! ## Usage
 //! To start benchmarking, you first need a [`QuickPerfEvent`] object.
@@ -66,6 +69,10 @@
 //! - **`QPE_FORMAT`** - set the output format, see above.
 //! - **`QPE_EVENTS`** - set the counters recorded by a default [PerfCounters] instance.
 //! - **`QPE_LINE_LEN`** - override the line length used for line wrapping live tables. If not set, terminal size is detected automatically.
+//!
+//! # Acknowledgements
+//! This crate is heavily inspired by [the C++ header only library](https://github.com/viktorleis/perfevent).
+
 mod labels;
 mod live_table;
 mod perf_counters;

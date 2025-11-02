@@ -4,13 +4,13 @@
 //! counters across labeled workloads or benchmarks.
 //! The output format can be controlled using the `QPE_FORMAT` environment variable:
 //!
-//! - `QPE_FORMAT=live` (default) — Uses **live table mode**, designed for development and
-//!   debugging. Each result is printed as soon as it’s available, with compact,
+//! - **`QPE_FORMAT=live`** (default) - Outputs a **live table**, designed for development and
+//!   debugging. Each result is printed as soon as it is available, with compact,
 //!   fixed-width, line-wrapped cells to fit many columns in narrow terminals.
 //!   If the requested columns still do not fit, table rows are line wrapped as well.
-//! - `QPE_FORMAT=md` — Generates a **Markdown table** after all runs have completed,
+//! - **`QPE_FORMAT=md`** - Generates a **Markdown table** after all runs have completed,
 //!   choosing column widths automatically for clean, publication-ready output.
-//! - `QPE_FORMAT=csv` — Streams results as **CSV** records to stdout, suitable for
+//! - **`QPE_FORMAT=csv`** - Streams results as **CSV** records to stdout, suitable for
 //!   further processsing.
 //!
 //! ## Example
@@ -47,7 +47,7 @@
 //! After each run, you **must** call [`record`](PerfReading::record) on the returned value to log the measurement.
 //! The [`record`](PerfReading::record) method takes two parameters:
 //!
-//! - **`scale`** – a normalization factor (e.g. number of iterations).  
+//! - **`scale`** - a normalization factor (e.g. number of iterations).  
 //!   All performance counters are divided by this value, producing results
 //!   such as *branch misses per operation* or *cycles per iteration*.
 //!   Note that the time column is not normalized.
@@ -55,11 +55,17 @@
 //!   Dividing this by scale would be misleading when multiple threads are involved.
 //!   If you want a measure of time spent per operation, consider using the task clock counter `t-clock`.
 //!
-//! - **`labels`** – metadata describing the measurement.  
+//! - **`labels`** - metadata describing the measurement.  
 //!   This can be:
 //!   - the unit type `()` (no labels),
 //!   - a string `&str` (single label),
 //!   - or a user-defined struct implementing [`Labels`].
+//!
+//! # Environment Variables
+//! Quick Perf Event can be configured using arious environment variables.
+//! - **`QPE_FORMAT`** - set the output format, see above.
+//! - **`QPE_EVENTS`** - set the counters recorded by a default [PerfCounters] instance.
+//! - **`QPE_LINE_LEN`** - override the line length used for line wrapping live tables. If not set, terminal size is detected automatically.
 mod labels;
 mod live_table;
 mod perf_counters;

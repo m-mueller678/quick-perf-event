@@ -17,7 +17,7 @@ fn main() {
         1,
         &Labels {
             operation: "my_op",
-            dataset: env::var("DATA").unwrap(),
+            dataset: env::var("DATA").unwrap_or_default(),
         },
     );
 }

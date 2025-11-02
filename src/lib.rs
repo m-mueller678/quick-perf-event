@@ -27,6 +27,47 @@ pub struct PerfEvent<L> {
     _p: PhantomData<L>,
 }
 
+impl<L: Labels> Default for PerfEvent<L> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<L: Labels> PerfEvent<L> {
+    pub fn new() -> Self {
+        Self::with_counters(PerfCounters::new())
+    }
+
+    pub fn with_counters(counters: PerfCounters) -> Self {
+        PerfEvent {
+            inner: PerfEvent2::new(counters, L::names()),
+            _p: PhantomData,
+        }
+    }
+
+    pub fn run<R>(&mut self, scale: usize, labels: impl Borrow<L>, f: impl FnOnce() -> R) -> R
+    where
+        L: Labels,
+    {
+        let start_time = SystemTime::now();
+        self.inner.counters.reset();
+        self.inner.counters.enable();
+        let ret = f();
+        self.inner.counters.disable();
+        PerfEvent2::report_error(
+            self.inner
+                .push(scale, start_time, &mut |dst| labels.borrow().values(dst)),
+        );
+        ret
+    }
+}
+
+impl Drop for PerfEvent2 {
+    fn drop(&mut self) {
+        self.dump_and_reset();
+    }
+}
+
 struct PerfEvent2 {
     counters: PerfCounters,
     state: OutputState,
@@ -48,6 +89,39 @@ enum OutputState {
 }
 
 impl PerfEvent2 {
+    fn new(counters: PerfCounters, label_names: &'static [&'static str]) -> Self {
+        PerfEvent2 {
+            state: match std::env::var("QPE_FORMAT").as_deref() {
+                Ok("csv") => OutputState::Csv {
+                    header_written: false,
+                    writer: csv::Writer::from_writer(Box::new(stdout())),
+                },
+                Ok("md") => OutputState::Tabled {
+                    readings: Vec::new(),
+                    markdown: true,
+                },
+                x => {
+                    match x {
+                        Ok(requested) => {
+                            eprintln!(
+                                "unrecognized value for QPE_FORMAT: {requested:?}.\nSupported values: csv, md"
+                            );
+                        }
+                        Err(_) => {}
+                    }
+                    OutputState::Interactive {
+                        table: StreamingTable::new(
+                            label_names.len() + 2 + counters.names().count(),
+                            9,
+                            160,
+                        ),
+                    }
+                }
+            },
+            counters,
+            label_names,
+        }
+    }
     fn push(
         &mut self,
         scale: usize,
@@ -225,76 +299,4 @@ struct PerfReadingExtra {
     scale: usize,
     labels: Vec<String>,
     counters: PerfReading,
-}
-
-impl<L: Labels> Default for PerfEvent<L> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<L: Labels> PerfEvent<L> {
-    pub fn new() -> Self {
-        Self::with_counters(PerfCounters::new())
-    }
-
-    pub fn with_counters(counters: PerfCounters) -> Self {
-        PerfEvent {
-            inner: PerfEvent2 {
-                state: match std::env::var("QPE_FORMAT").as_deref() {
-                    Ok("csv") => OutputState::Csv {
-                        header_written: false,
-                        writer: csv::Writer::from_writer(Box::new(stdout())),
-                    },
-                    Ok("md") => OutputState::Tabled {
-                        readings: Vec::new(),
-                        markdown: true,
-                    },
-                    x => {
-                        match x {
-                            Ok(requested) => {
-                                eprintln!(
-                                    "unrecognized value for QPE_FORMAT: {requested:?}.\nSupported values: csv, md"
-                                );
-                            }
-                            Err(_) => {}
-                        }
-                        OutputState::Interactive {
-                            table: StreamingTable::new(
-                                L::names().len() + 2 + counters.names().count(),
-                                9,
-                                160,
-                            ),
-                        }
-                    }
-                },
-                counters,
-                label_names: L::names(),
-            },
-
-            _p: PhantomData,
-        }
-    }
-
-    pub fn run<R>(&mut self, scale: usize, labels: impl Borrow<L>, f: impl FnOnce() -> R) -> R
-    where
-        L: Labels,
-    {
-        let start_time = SystemTime::now();
-        self.inner.counters.reset();
-        self.inner.counters.enable();
-        let ret = f();
-        self.inner.counters.disable();
-        PerfEvent2::report_error(
-            self.inner
-                .push(scale, start_time, &mut |dst| labels.borrow().values(dst)),
-        );
-        ret
-    }
-}
-
-impl Drop for PerfEvent2 {
-    fn drop(&mut self) {
-        self.dump_and_reset();
-    }
 }

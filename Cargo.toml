@@ -2,6 +2,13 @@
 name = "quick_perf_event"
 version = "0.1.0"
 edition = "2024"
+license = "MIT OR Apache-2.0"
+authors = ["m-mueller678"]
+description = "lightweight framework for measuring and reporting performance counters accross labeled workloads"
+repository = "https://github.com/m-mueller678/quick-perf-event"
+readme = "readme.md"
+categories = ["development-tools::profiling"]
+keywords = ["perf","perf-events","perf-event-open","benchmark","performance-opimization"]
 
 [dependencies]
 perf-event2="0.7.4"

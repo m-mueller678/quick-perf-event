@@ -20,7 +20,6 @@ pub struct LiveTable {
 
 impl LiveTable {
     pub fn new(column_count: usize, cell_size: usize, line_width: usize) -> Self {
-        dbg!(line_width);
         let columns_per_line = ((line_width - 1) / (cell_size + 1)).max(1);
         assert!(column_count > 0);
         assert!(cell_size > 2);

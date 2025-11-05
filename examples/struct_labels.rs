@@ -1,4 +1,4 @@
-use quick_perf_event::{QuickPerfEvent, struct_labels};
+use quick_perf_event::{from_env, struct_labels};
 use std::env;
 
 struct_labels! {
@@ -9,7 +9,7 @@ struct_labels! {
 }
 
 fn main() {
-    let mut perf = QuickPerfEvent::<Labels>::from_env();
+    let mut perf = from_env::<Labels>();
     let result = perf.run(|| {
         // benchmarked code
     });

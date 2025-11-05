@@ -112,16 +112,16 @@ pub struct PerfReading<'a, L: ?Sized + Labels, C: Counters, F: Format, T> {
     ret: T,
 }
 
-impl<L: Labels + ?Sized> QuickPerfEvent<L, Box<dyn Counters>, Box<dyn Format>> {
-    /// Create a `QuickPerfEvent` configured from environment variables.
-    pub fn from_env() -> Self {
-        Self::with_counters_and_format(counters_from_env(), format_from_env())
-    }
+/// Create a `QuickPerfEvent` configured from environment variables.
+pub fn from_env<L: Labels + ?Sized>() -> QuickPerfEvent<L, Box<dyn Counters>, Box<dyn Format>> {
+    QuickPerfEvent::new(counters_from_env(), format_from_env())
 }
 
 impl<L: Labels + ?Sized, C: Counters, F: Format> QuickPerfEvent<L, C, F> {
-    /// Create a `QuickPerfEvent` with a custom set of performance counters.
-    pub fn with_counters_and_format(counters: C, format: F) -> Self {
+    /// Create a `QuickPerfEvent` with custom performance counters and format.
+    ///
+    /// For constructing a default instance from environment variables, see [from_env].
+    pub fn new(counters: C, format: F) -> Self {
         QuickPerfEvent {
             counters,
             error_printed: false,

@@ -9,7 +9,7 @@ struct_labels! {
 }
 
 fn main() {
-    let mut perf = QuickPerfEvent::<Labels>::new();
+    let mut perf = QuickPerfEvent::<Labels>::from_env();
     let result = perf.run(|| {
         // benchmarked code
     });

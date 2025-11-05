@@ -4,7 +4,7 @@
 //! the load can only be started after the previous load completes.
 //! Therefore, each loop iteration takes roughtly as long as the access latency.
 
-use quick_perf_event::{QuickPerfEvent, TabledFloat, struct_labels};
+use quick_perf_event::{QuickPerfEvent, formats::TabledFloat, struct_labels};
 use rand::{SeedableRng, rng, rngs::SmallRng, seq::SliceRandom};
 use std::mem;
 
@@ -39,7 +39,7 @@ fn walk_ptr_loop(steps: usize, size: usize, qpe: &mut QuickPerfEvent<Labels>) {
 }
 
 fn main() {
-    let mut qpe = QuickPerfEvent::new();
+    let mut qpe = QuickPerfEvent::from_env();
     for scale in (12..20).chain((21..30).step_by(2)) {
         walk_ptr_loop(40_000_000, 1 << scale, &mut qpe);
     }

@@ -1,4 +1,4 @@
-use quick_perf_event::LiveTable;
+use quick_perf_event::formats::LiveTable;
 
 fn print_table<'a>(
     column_count: usize,

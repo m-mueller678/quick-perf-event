@@ -11,7 +11,6 @@ categories = ["development-tools::profiling"]
 keywords = ["perf", "perf-events", "perf-event-open", "benchmark"]
 
 [dependencies]
-perf-event2 = "0.7.4"
 tabled = { version = "0.20.0", default-features = false, features = ["std"] }
 csv = "1.4"
 textwrap = { version = "0.16.2", default-features = false, features = [
@@ -19,6 +18,9 @@ textwrap = { version = "0.16.2", default-features = false, features = [
   "unicode-linebreak",
 ] }
 terminal_size = "0.4.3"
+
+[target.'cfg(target_os="linux")'.dependencies]
+perf-event2 = "0.7.4"
 
 [dev-dependencies]
 rand = "0.9"

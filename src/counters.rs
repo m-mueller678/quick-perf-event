@@ -1,6 +1,8 @@
+#[cfg(target_os = "linux")]
 mod perf_backend;
 mod time_backend;
 
+#[cfg(target_os = "linux")]
 pub use perf_backend::PerfBackend;
 pub use time_backend::TimeBackend;
 
@@ -79,7 +81,10 @@ impl<A: Counters, B: Counters> Counters for (A, B) {
 /// The exact set of counters it includes is subject to change.
 /// Currently, it consists of a [`TimeBackEnd`] and a default [`PerfBackEnd`].
 pub fn counters_from_env() -> Box<dyn Counters> {
-    Box::new((TimeBackend::new(), PerfBackend::new()))
+    #[cfg(target_os = "linux")]
+    return Box::new((TimeBackend::new(), PerfBackend::new()));
+    #[cfg(not(target_os = "linux"))]
+    return Box::new(TimeBackend::new());
 }
 
 /// A reading of a performance counter.

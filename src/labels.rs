@@ -17,11 +17,12 @@ macro_rules! struct_labels {
         }
 
         impl $crate::Labels for $Name{
-            fn names()->&'static [&'static str]{
-                &[
-                    $(std::stringify!($f),)*
-                ]
+            fn meta()->&'static [$crate::LabelMeta]{
+                &const{[
+                    $($crate::LabelMeta::new(stringify!($f)),)*
+                ]}
             }
+
 
             fn values(&self,f:&mut dyn FnMut(&str)){
                 $(f(std::convert::AsRef::as_ref(&self.$f));)*
@@ -38,14 +39,39 @@ macro_rules! struct_labels {
 /// [`struct_labels!`](crate::struct_labels) macro.
 pub trait Labels {
     /// Returns the static list of label names in order.
-    fn names() -> &'static [&'static str];
+    fn meta() -> &'static [LabelMeta];
     /// Calls `f` for each label value, in the same order as [`names`](Self::names).
     fn values(&self, f: &mut dyn FnMut(&str));
 }
 
+/// Metadata about a label
+pub struct LabelMeta {
+    name: &'static str,
+    width: usize,
+}
+
+impl LabelMeta {
+    pub fn name(&self) -> &'static str {
+        self.name
+    }
+
+    pub fn width(&self) -> usize {
+        self.width
+    }
+
+    pub const fn new(name: &'static str) -> Self {
+        LabelMeta { name, width: 9 }
+    }
+
+    pub const fn with_width(mut self, width: usize) -> Self {
+        self.width = width;
+        self
+    }
+}
+
 /// No labels.
 impl Labels for () {
-    fn names() -> &'static [&'static str] {
+    fn meta() -> &'static [LabelMeta] {
         &[]
     }
 
@@ -54,8 +80,11 @@ impl Labels for () {
 
 /// Treats the string as a single label with name `"label"`.
 impl Labels for str {
-    fn names() -> &'static [&'static str] {
-        &["label"]
+    fn meta() -> &'static [LabelMeta] {
+        &[LabelMeta {
+            name: "label",
+            width: 20,
+        }]
     }
 
     fn values(&self, f: &mut dyn FnMut(&str)) {

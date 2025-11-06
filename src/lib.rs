@@ -75,7 +75,7 @@ pub mod counters;
 pub mod formats;
 mod labels;
 
-pub use labels::Labels;
+pub use labels::{LabelMeta, Labels};
 
 use crate::{
     counters::{Counters, counters_from_env},
@@ -186,7 +186,7 @@ impl<'a, L: Labels + ?Sized, T, C: Counters, F: Format> Reading<'a, L, T, C, F> 
             self.start_time,
             &mut self.pe.counters,
             &mut |dst| labels.borrow().values(dst),
-            L::names(),
+            L::meta(),
         ) {
             if !self.pe.error_printed {
                 self.pe.error_printed = true;
@@ -228,7 +228,7 @@ impl<'a, L: Labels + ?Sized, C: Counters, F: Format> Running<'a, L, C, F> {
 
 impl<L: Labels + ?Sized, C: Counters, F: Format> Drop for QuickPerfEvent<L, C, F> {
     fn drop(&mut self) {
-        if let Err(e) = self.format.dump_and_reset(L::names(), &mut self.counters) {
+        if let Err(e) = self.format.dump_and_reset(L::meta(), &mut self.counters) {
             if !self.error_printed {
                 eprintln!("error finnishing report: {e}");
             }
@@ -236,8 +236,8 @@ impl<L: Labels + ?Sized, C: Counters, F: Format> Drop for QuickPerfEvent<L, C, F
     }
 }
 
-fn visit<T: ?Sized>(counters: &[impl AsRef<T>], dst: &mut dyn FnMut(&T)) {
+fn visit<T: ?Sized>(counters: &[impl Borrow<T>], dst: &mut dyn FnMut(&T)) {
     for name in counters {
-        dst(name.as_ref())
+        dst(name.borrow())
     }
 }

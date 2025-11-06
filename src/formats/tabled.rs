@@ -1,5 +1,8 @@
 use super::Format;
-use crate::counters::{Counters, CounterReading};
+use crate::{
+    counters::{CounterReading, Counters},
+    labels::LabelMeta,
+};
 use std::{error::Error, iter, mem};
 use tabled::settings::Style;
 
@@ -30,7 +33,7 @@ impl Format for Tabled {
         _start_time: std::time::SystemTime,
         counters: &mut dyn Counters,
         labels: &mut dyn FnMut(&mut dyn FnMut(&str)),
-        _label_names: &'static [&'static str],
+        _label_meta: &'static [LabelMeta],
     ) -> Result<(), Box<dyn Error>> {
         let mut label_vec = Vec::new();
         labels(&mut |l: &str| label_vec.push(l.to_string()));
@@ -48,11 +51,11 @@ impl Format for Tabled {
 
     fn dump_and_reset(
         &mut self,
-        label_names: &'static [&'static str],
+        label_meta: &'static [LabelMeta],
         counters: &mut dyn Counters,
     ) -> Result<(), Box<dyn Error>> {
         let mut table = tabled::builder::Builder::new();
-        table.push_record(label_names.iter().copied());
+        table.push_record(label_meta.iter().map(|x| x.name()));
         for reading in &mut self.readings {
             table.push_record(mem::take(&mut reading.labels));
         }

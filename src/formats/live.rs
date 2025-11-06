@@ -1,9 +1,10 @@
 use super::{Format, LiveTable, TabledFloat};
 use crate::{
     counters::{CounterReading, Counters, count_counters},
+    labels::LabelMeta,
     visit,
 };
-use std::{env, error::Error};
+use std::{env, error::Error, iter};
 
 pub struct Live {
     inner: Option<Inner>,
@@ -27,14 +28,17 @@ impl Format for Live {
         _start_time: std::time::SystemTime,
         counters: &mut dyn Counters,
         labels: &mut dyn FnMut(&mut dyn FnMut(&str)),
-        label_names: &'static [&'static str],
+        label_meta: &'static [LabelMeta],
     ) -> Result<(), Box<dyn Error>> {
         let mut err = Ok(());
         let this = self.inner.get_or_insert_with(|| {
             let num_counters = count_counters(counters);
             let mut table = LiveTable::new(
-                label_names.len() + 1 + num_counters,
-                9,
+                label_meta
+                    .iter()
+                    .map(|x| x.width())
+                    .chain(iter::repeat_n(7, num_counters + 1))
+                    .collect(),
                 env::var("QPE_LINE_LEN")
                     .ok()
                     .and_then(|x| {
@@ -52,7 +56,7 @@ impl Format for Live {
                     err = table.push(x.to_string());
                 }
             };
-            visit(label_names, push);
+            visit(label_meta, &mut |x| push(x.name()));
             push("scale");
             counters.names(push);
             Inner {
@@ -79,7 +83,7 @@ impl Format for Live {
 
     fn dump_and_reset(
         &mut self,
-        _label_names: &'static [&'static str],
+        _label_meta: &'static [LabelMeta],
         _counters: &mut dyn Counters,
     ) -> Result<(), Box<dyn Error>> {
         if let Some(this) = &mut self.inner {

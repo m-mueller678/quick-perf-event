@@ -10,7 +10,7 @@ pub use live_table::LiveTable;
 pub use tabled::Tabled;
 pub use tabled_float::TabledFloat;
 
-use crate::counters::Counters;
+use crate::{counters::Counters, labels::LabelMeta};
 use std::error::Error;
 
 pub trait Format {
@@ -20,11 +20,11 @@ pub trait Format {
         start_time: std::time::SystemTime,
         counters: &mut dyn Counters,
         labels: &mut dyn FnMut(&mut dyn FnMut(&str)),
-        label_names: &'static [&'static str],
+        label_meta: &'static [LabelMeta],
     ) -> Result<(), Box<dyn Error>>;
     fn dump_and_reset(
         &mut self,
-        label_names: &'static [&'static str],
+        label_meta: &'static [LabelMeta],
         counters: &mut dyn Counters,
     ) -> Result<(), Box<dyn Error>>;
 }
@@ -36,17 +36,17 @@ impl Format for Box<dyn Format> {
         start_time: std::time::SystemTime,
         counters: &mut dyn Counters,
         labels: &mut dyn FnMut(&mut dyn FnMut(&str)),
-        label_names: &'static [&'static str],
+        label_meta: &'static [LabelMeta],
     ) -> Result<(), Box<dyn Error>> {
-        (**self).push(scale, start_time, counters, labels, label_names)
+        (**self).push(scale, start_time, counters, labels, label_meta)
     }
 
     fn dump_and_reset(
         &mut self,
-        label_names: &'static [&'static str],
+        label_meta: &'static [LabelMeta],
         counters: &mut dyn Counters,
     ) -> Result<(), Box<dyn Error>> {
-        (**self).dump_and_reset(label_names, counters)
+        (**self).dump_and_reset(label_meta, counters)
     }
 }
 

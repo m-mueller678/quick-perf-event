@@ -1,6 +1,7 @@
 use super::Format;
 use crate::{
     counters::{CounterReading, Counters},
+    labels::LabelMeta,
     visit,
 };
 use std::{
@@ -32,14 +33,14 @@ impl Format for Csv {
         start_time: std::time::SystemTime,
         counters: &mut dyn Counters,
         labels: &mut dyn FnMut(&mut dyn FnMut(&str)),
-        label_names: &'static [&'static str],
+        label_meta: &'static [LabelMeta],
     ) -> Result<(), Box<dyn Error>> {
         let mut err = Ok(());
         if !self.header_written {
             self.header_written = true;
-            visit(label_names, &mut |x: &str| {
+            visit(label_meta, &mut |x| {
                 if err.is_ok() {
-                    err = self.writer.write_field(x)
+                    err = self.writer.write_field(x.name())
                 }
             });
             self.writer.write_field("start_time")?;
@@ -82,7 +83,7 @@ impl Format for Csv {
 
     fn dump_and_reset(
         &mut self,
-        _label_names: &'static [&'static str],
+        _label_meta: &'static [LabelMeta],
         _counters: &mut dyn Counters,
     ) -> Result<(), Box<dyn Error>> {
         self.header_written = false;

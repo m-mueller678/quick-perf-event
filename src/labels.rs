@@ -83,7 +83,7 @@ impl Labels for str {
     fn meta() -> &'static [LabelMeta] {
         &[LabelMeta {
             name: "label",
-            width: 20,
+            width: 30,
         }]
     }
 

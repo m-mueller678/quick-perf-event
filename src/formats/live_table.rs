@@ -56,7 +56,7 @@ impl LiveTable {
             line: Vec::new(),
             table_started: false,
             field_separator: "│",
-            line_delimiter: "║",
+            line_delimiter: "│",
             current_cgroup: 0,
             column_group_separators: (0..column_groups.len())
                 .map(|i| {
@@ -65,18 +65,18 @@ impl LiveTable {
                             &column_groups[(i + cgl - 1) % cgl],
                             &column_groups[i],
                             line_width,
-                            "╠",
-                            &["═", "╧", "╤", "╪"],
-                            "╣",
+                            "├",
+                            &["─", "┴", "┬", "┼"],
+                            "┤",
                         )
                     } else {
                         Self::make_separtor(
                             &column_groups[(i + cgl - 1) % cgl],
                             &column_groups[i],
                             line_width,
-                            "╟",
-                            &["─", "┴", "┬", "┼"],
-                            "╢",
+                            "├",
+                            &["╌", "┴", "┬", "┼"],
+                            "┤",
                         )
                     }
                 })
@@ -85,17 +85,17 @@ impl LiveTable {
                 &column_groups[0],
                 &column_groups[0],
                 line_width,
-                "╔",
-                &["═", "═", "╤", "╤"],
-                "╗",
+                "┌",
+                &["─", "─", "┬", "┬"],
+                "┐",
             ),
             end_separator: Self::make_separtor(
                 &column_groups[cgl - 1],
                 &column_groups[cgl - 1],
                 line_width,
-                "╚",
-                &["═", "╧", "═", "╧"],
-                "╝",
+                "└",
+                &["─", "┴", "─", "┴"],
+                "┘",
             ),
             column_groups,
         }

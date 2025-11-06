@@ -98,6 +98,7 @@ pub struct QuickPerfEvent<
     C: Counters = Box<dyn Counters>,
     F: Format = Box<dyn Format>,
 > {
+    running: bool,
     counters: C,
     format: F,
     error_printed: bool,
@@ -106,10 +107,26 @@ pub struct QuickPerfEvent<
 
 /// See [`QuickPerfEvent::run`] and the crate level docs.
 #[must_use]
-pub struct PerfReading<'a, L: ?Sized + Labels, C: Counters, F: Format, T> {
+pub struct Reading<
+    'a,
+    L: ?Sized + Labels,
+    T = (),
+    C: Counters = Box<dyn Counters>,
+    F: Format = Box<dyn Format>,
+> {
     pe: &'a mut QuickPerfEvent<L, C, F>,
     start_time: SystemTime,
     ret: T,
+}
+
+pub struct Running<
+    'a,
+    L: ?Sized + Labels,
+    C: Counters = Box<dyn Counters>,
+    F: Format = Box<dyn Format>,
+> {
+    pe: &'a mut QuickPerfEvent<L, C, F>,
+    start_time: SystemTime,
 }
 
 /// Create a `QuickPerfEvent` configured from environment variables.
@@ -123,6 +140,7 @@ impl<L: Labels + ?Sized, C: Counters, F: Format> QuickPerfEvent<L, C, F> {
     /// For constructing a default instance from environment variables, see [from_env].
     pub fn new(counters: C, format: F) -> Self {
         QuickPerfEvent {
+            running: false,
             counters,
             error_printed: false,
             format,
@@ -130,24 +148,34 @@ impl<L: Labels + ?Sized, C: Counters, F: Format> QuickPerfEvent<L, C, F> {
         }
     }
 
-    /// Perform a measurement.
+    /// Measure the execution of a function.
     ///
-    /// You **must** call [`record`](PerfReading::record) on the returned value.
-    pub fn run<R>(&mut self, f: impl FnOnce() -> R) -> PerfReading<'_, L, C, F, R> {
+    /// This is a shorthand for wrapping the function in [`start`](Self::start) and [`stop`](Running::stop) calls.
+    pub fn run<R>(&mut self, f: impl FnOnce() -> R) -> Reading<'_, L, R, C, F> {
+        let running = self.start();
+        let ret = f();
+        running.stop().replace_return_value(ret).0
+    }
+
+    /// Start a measurement.
+    ///
+    /// After running your benchmark, call [`stop`](Running::stop) on the returned value to obtain a [`Reading`]
+    pub fn start(&mut self) -> Running<'_, L, C, F> {
         let start_time = SystemTime::now();
+        if self.running {
+            self.counters.disable();
+        }
+        self.running = true;
         self.counters.reset();
         self.counters.enable();
-        let ret = f();
-        self.counters.disable();
-        PerfReading {
-            start_time,
-            ret,
+        Running {
             pe: self,
+            start_time,
         }
     }
 }
 
-impl<L: Labels + ?Sized, T, C: Counters, F: Format> PerfReading<'_, L, C, F, T> {
+impl<'a, L: Labels + ?Sized, T, C: Counters, F: Format> Reading<'a, L, T, C, F> {
     /// Records the measured result.
     ///
     /// The `scale` argument normalizes counter values (e.g. per iteration count).
@@ -166,6 +194,35 @@ impl<L: Labels + ?Sized, T, C: Counters, F: Format> PerfReading<'_, L, C, F, T> 
             }
         }
         self.ret
+    }
+
+    /// Replace the associated return value.
+    ///
+    /// A [`Reading`] contains an associated return value, which is returned from [`record`].
+    /// For a [`Reading`] constructed from [`QuickPerfEvent::run`], this is the return value of the passed in function.
+    /// This method can be used to separate this value from the reading, or to combine the reading with a return new value.
+    pub fn replace_return_value<U>(self, ret: U) -> (Reading<'a, L, U, C, F>, T) {
+        (
+            Reading {
+                pe: self.pe,
+                start_time: self.start_time,
+                ret,
+            },
+            self.ret,
+        )
+    }
+}
+
+impl<'a, L: Labels + ?Sized, C: Counters, F: Format> Running<'a, L, C, F> {
+    /// Stop the measurement.
+    pub fn stop(self) -> Reading<'a, L, (), C, F> {
+        self.pe.counters.disable();
+        self.pe.running = false;
+        Reading {
+            pe: self.pe,
+            start_time: self.start_time,
+            ret: (),
+        }
     }
 }
 

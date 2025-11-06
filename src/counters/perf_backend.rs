@@ -23,7 +23,7 @@ impl PerfBackend {
         let events = std::env::var("QPE_EVENTS");
         let events = events
             .as_deref()
-            .unwrap_or("cycle,kcycle,l1-miss,llc-miss,br-miss")
+            .unwrap_or("cycle,kcycle,instr,l1-miss,llc-miss,br-miss,t-clock")
             .split(",");
         Self::with_counter_names(events)
     }

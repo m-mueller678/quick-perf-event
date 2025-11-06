@@ -64,7 +64,6 @@ impl LiveTable {
                         Self::make_separtor(
                             &column_groups[(i + cgl - 1) % cgl],
                             &column_groups[i],
-                            line_width,
                             "├",
                             &["─", "┴", "┬", "┼"],
                             "┤",
@@ -73,7 +72,6 @@ impl LiveTable {
                         Self::make_separtor(
                             &column_groups[(i + cgl - 1) % cgl],
                             &column_groups[i],
-                            line_width,
                             "├",
                             &["╌", "┴", "┬", "┼"],
                             "┤",
@@ -84,7 +82,6 @@ impl LiveTable {
             head_separator: Self::make_separtor(
                 &column_groups[0],
                 &column_groups[0],
-                line_width,
                 "┌",
                 &["─", "─", "┬", "┬"],
                 "┐",
@@ -92,7 +89,6 @@ impl LiveTable {
             end_separator: Self::make_separtor(
                 &column_groups[cgl - 1],
                 &column_groups[cgl - 1],
-                line_width,
                 "└",
                 &["─", "┴", "─", "┴"],
                 "┘",
@@ -147,7 +143,6 @@ impl LiveTable {
     fn make_separtor(
         above: &[usize],
         below: &[usize],
-        line_width: usize,
         start: &str,
         crosses: &[&str],
         end: &str,

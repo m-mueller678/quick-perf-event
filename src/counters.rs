@@ -1,7 +1,9 @@
+mod manual_backend;
 #[cfg(target_os = "linux")]
 mod perf_backend;
 mod time_backend;
 
+pub use manual_backend::ManualBackend;
 #[cfg(target_os = "linux")]
 pub use perf_backend::PerfBackend;
 pub use time_backend::TimeBackend;
@@ -81,6 +83,9 @@ impl<A: Counters, B: Counters> Counters for (A, B) {
 /// The exact set of counters it includes is subject to change.
 /// Currently, it consists of a [`TimeBackEnd`] and a default [`PerfBackEnd`].
 pub fn counters_from_env() -> Box<dyn Counters> {
+    if std::env::var("QPE_MANUAL").is_ok() {
+        return Box::new((TimeBackend::new(), ManualBackend::from_env()));
+    }
     #[cfg(target_os = "linux")]
     return Box::new((TimeBackend::new(), PerfBackend::new()));
     #[cfg(not(target_os = "linux"))]

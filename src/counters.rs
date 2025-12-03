@@ -83,8 +83,8 @@ impl<A: Counters, B: Counters> Counters for (A, B) {
 /// The exact set of counters it includes is subject to change.
 /// Currently, it consists of a [`TimeBackEnd`] and a default [`PerfBackEnd`].
 pub fn counters_from_env() -> Box<dyn Counters> {
-    if std::env::var("QPE_MANUAL").is_ok() {
-        return Box::new((TimeBackend::new(), ManualBackend::from_env()));
+    if let Some(manual) = ManualBackend::from_env() {
+        return Box::new((TimeBackend::new(), manual));
     }
     #[cfg(target_os = "linux")]
     return Box::new((TimeBackend::new(), PerfBackend::new()));

@@ -7,11 +7,11 @@ use crate::counters::Counters;
 /// This is intened to allow you to attach an external profiling tool to the running process for measurements.
 /// Naturally, the data captured by the external tool will not be available as a counter value.
 ///
-/// By default, waiting is performed by reading one line from stdin and discarding it.
+/// How waiting is performed, is configured by the environment variable `QPE_MANUAL`.
+/// If it is set to `read`, waiting is performed by reading one line from stdin and discarding it.
 /// A warning is issued if the line contains anything but whitespace.
-/// Waiting may also be performed by sleeping for a fixed duration.
-/// To do so, set `QPE_MANUAL_SLEEP` to the desired duration in seconds.
-/// In this case, `stdin` is not interacted with.
+/// Otherwise, the value is parsed as a floating point number.
+/// Waiting is performed by sleeping for the given number of seconds.
 ///
 /// To make the start and stop messages reliably detectable, you may specifiy a unique string via `QPE_MANUAL_MARKER`, which will be included in all messages.
 pub struct ManualBackend {
@@ -20,14 +20,19 @@ pub struct ManualBackend {
 }
 
 impl ManualBackend {
-    pub fn from_env() -> Self {
-        let duration = std::env::var("QPE_MANUAL_SLEEP")
-            .ok()
-            .map(|x| Duration::from_secs_f64(x.parse().expect("failed to parse duration")));
-        ManualBackend {
+    pub fn from_env() -> Option<Self> {
+        let var = std::env::var("QPE_MANUAL").ok()?;
+        let duration = if var == "read" {
+            None
+        } else {
+            Some(Duration::from_secs_f64(
+                var.parse().expect("failed to parse duration"),
+            ))
+        };
+        Some(ManualBackend {
             duration,
             marker: std::env::var("QPE_MANUAL_MARKER").unwrap_or_default(),
-        }
+        })
     }
 
     fn print_and_wait(&self, msg: &str) {

@@ -52,14 +52,16 @@ impl Counters for Box<dyn Counters> {
 }
 
 impl<A: Counters, B: Counters> Counters for (A, B) {
+    /// Enables A, then B
     fn enable(&mut self) {
         self.0.enable();
         self.1.enable();
     }
 
+    /// Disables B, then A (reverse starting order)
     fn disable(&mut self) {
-        self.0.disable();
         self.1.disable();
+        self.0.disable();
     }
 
     fn reset(&mut self) {
@@ -84,7 +86,7 @@ impl<A: Counters, B: Counters> Counters for (A, B) {
 /// Currently, it consists of a [`TimeBackEnd`] and a default [`PerfBackEnd`].
 pub fn counters_from_env() -> Box<dyn Counters> {
     if let Some(manual) = ManualBackend::from_env() {
-        return Box::new((TimeBackend::new(), manual));
+        return Box::new((manual, TimeBackend::new()));
     }
     #[cfg(target_os = "linux")]
     return Box::new((TimeBackend::new(), PerfBackend::new()));
